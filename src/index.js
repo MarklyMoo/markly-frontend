@@ -1,6 +1,21 @@
 import React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
+
+// ── Your backend URL ──
+const API = 'https://markly-api-byal.onrender.com';
+
+// ── API helper ──
+async function api(path, opts = {}) {
+  const token = localStorage.getItem('markly-token');
+  const headers = { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  try {
+    const r = await fetch(`${API}${path}`, { ...opts, headers: { ...headers, ...opts.headers } });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  } catch (e) { console.error(e); throw e; }
+}
 
 // ── Utilities ──
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -13,7 +28,6 @@ const I = {
   Arrow: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   Back: () => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
   Copy: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>,
-  Refresh: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>,
   Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   Home: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
   Social: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A3 3 0 1018 2a3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6z"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
@@ -27,7 +41,6 @@ const I = {
 };
 
 // ── Config ──
-const API = process.env.REACT_APP_API_URL || '';
 const CHANNELS = [
   { id:"instagram", label:"Instagram" }, { id:"facebook", label:"Facebook" },
   { id:"tiktok", label:"TikTok" }, { id:"twitter", label:"X / Twitter" },
@@ -47,7 +60,6 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Outfit:wght@700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 input:focus,textarea:focus{border-color:#818CF8!important;outline:none}
 ::selection{background:rgba(129,140,248,.3)}
@@ -65,23 +77,12 @@ const $ = {
   dot: (a, d) => ({ width:28,height:4,borderRadius:2,background:d?"#34D399":a?"#818CF8":"#1E293B",transition:"all .3s" }),
 };
 
-// ── AI Generate ──
-async function aiGenerate({ name, description, audience, channels }) {
-  const prompt = `You are an expert marketing strategist. Generate a complete marketing plan.\n\nBusiness: ${name}\nDescription: ${description}\nAudience: ${audience}\nChannels: ${channels.join(", ")}\n\nRespond ONLY with valid JSON:\n{"strategy":{"summary":"...","tone":"...","posting_frequency":"...","key_themes":["...","...","..."]},"social_posts":[{"platform":"...","content":"...","type":"...","best_time":"..."}],"email_sequences":[{"name":"...","subject":"...","preview":"...","body":"..."}],"ad_copy":[{"platform":"...","headline":"...","body":"...","cta":"...","targeting_tip":"..."}]}\nGenerate 4+ social posts, 2 emails, 2 ads. Be specific. No markdown.`;
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:4000, messages:[{role:"user",content:prompt}] }) });
-    const d = await r.json();
-    return JSON.parse((d.content?.map(c=>c.text||"").join("")||"").replace(/```json|```/g,"").trim());
-  } catch(e) { console.error(e); return null; }
-}
-
-// ── Copy Button ──
+// ── Components ──
 function CopyBtn({ text }) {
   const [c, setC] = useState(false);
   return <button style={$.sm} onClick={() => { copy(text); setC(true); setTimeout(()=>setC(false),1200); }}>{c?<I.Check/>:<I.Copy/>}{c?"Copied":"Copy"}</button>;
 }
 
-// ── Toast ──
 function Toast({ msg, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, [onDone]);
   return <div style={{ position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:200,background:"#34D399",color:"#0B0F1A",padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700,animation:"fadeUp .25s ease-out",fontFamily:"'DM Sans',sans-serif" }}>{msg}</div>;
@@ -91,7 +92,6 @@ function Toast({ msg, onDone }) {
 //  MAIN APP
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function App() {
-  // Auth
   const [user, setUser] = useState(null);
   const [authPage, setAuthPage] = useState("login");
   const [authName, setAuthName] = useState("");
@@ -99,84 +99,153 @@ function App() {
   const [authPass, setAuthPass] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
-  // App
   const [page, setPage] = useState("home");
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
 
-  // Form
   const [bizName, setBizName] = useState("");
   const [bizDesc, setBizDesc] = useState("");
   const [audience, setAudience] = useState("");
   const [channels, setChannels] = useState([]);
 
-  // Data
   const [plans, setPlans] = useState([]);
   const [activePlan, setActivePlan] = useState(null);
   const [dashTab, setDashTab] = useState("social");
-
-  // Editing
   const [editId, setEditId] = useState(null);
   const [editTxt, setEditTxt] = useState("");
 
-  // Loading messages
   const loadMsgs = ["Analyzing your business...","Crafting brand voice...","Generating social posts...","Writing emails...","Building ad campaigns...","Finalizing plan..."];
   const [loadIdx, setLoadIdx] = useState(0);
   useEffect(() => { if (!loading) return; const t = setInterval(()=>setLoadIdx(i=>(i+1)%loadMsgs.length), 2200); return ()=>clearInterval(t); }, [loading]);
 
-  // Auth - stored in localStorage
+  // Check if already logged in
   useEffect(() => {
-    const saved = localStorage.getItem('markly-user');
-    if (saved) { try { setUser(JSON.parse(saved)); } catch {} }
-    const savedPlans = localStorage.getItem('markly-plans');
-    if (savedPlans) { try { setPlans(JSON.parse(savedPlans)); } catch {} }
+    const token = localStorage.getItem('markly-token');
+    if (token) {
+      api('/api/auth/me').then(data => {
+        setUser(data.user);
+        return api('/api/plans');
+      }).then(data => {
+        setPlans(data.plans || []);
+      }).catch(() => {
+        localStorage.removeItem('markly-token');
+      });
+    }
   }, []);
-  useEffect(() => { if (user) localStorage.setItem('markly-user', JSON.stringify(user)); }, [user]);
-  useEffect(() => { localStorage.setItem('markly-plans', JSON.stringify(plans)); }, [plans]);
 
-  // Simple local auth (no backend needed for now)
-  const handleSignup = () => {
+  // ── Auth: calls real backend ──
+  const handleSignup = async () => {
     if (!authName.trim() || !authEmail.trim() || !authPass.trim()) { setAuthError("All fields required"); return; }
     if (authPass.length < 6) { setAuthError("Password must be 6+ characters"); return; }
-    const newUser = { id: uid(), name: authName.trim(), email: authEmail.trim(), plan: "free" };
-    setUser(newUser);
+    setAuthLoading(true);
     setAuthError("");
-    setToast("Welcome to Markly!");
+    try {
+      const data = await api('/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ name: authName.trim(), email: authEmail.trim(), password: authPass }),
+      });
+      localStorage.setItem('markly-token', data.token);
+      setUser(data.user);
+      setToast("Welcome to Markly!");
+    } catch (e) {
+      setAuthError(e.message || "Signup failed. Try again.");
+    }
+    setAuthLoading(false);
   };
-  const handleLogin = () => {
+
+  const handleLogin = async () => {
     if (!authEmail.trim() || !authPass.trim()) { setAuthError("Email and password required"); return; }
-    const saved = localStorage.getItem('markly-user');
-    if (saved) { setUser(JSON.parse(saved)); setAuthError(""); setToast("Welcome back!"); }
-    else { setAuthError("No account found. Sign up first."); }
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const data = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: authEmail.trim(), password: authPass }),
+      });
+      localStorage.setItem('markly-token', data.token);
+      setUser(data.user);
+      // Load plans
+      try {
+        const plansData = await api('/api/plans');
+        setPlans(plansData.plans || []);
+      } catch {}
+      setToast("Welcome back!");
+    } catch (e) {
+      setAuthError(e.message || "Invalid email or password.");
+    }
+    setAuthLoading(false);
   };
-  const handleLogout = () => { setUser(null); localStorage.removeItem('markly-user'); setPage("home"); };
+
+  const handleLogout = () => {
+    setUser(null);
+    setPlans([]);
+    localStorage.removeItem('markly-token');
+    setPage("home");
+  };
 
   const toggleCh = (id) => setChannels(p => p.includes(id)?p.filter(c=>c!==id):[...p,id]);
   const canNext = () => step===0?bizName.trim()&&bizDesc.trim():step===1?!!audience:channels.length>0;
 
+  // ── Generate: calls real backend ──
   const handleGenerate = async () => {
     setLoading(true);
-    const data = await aiGenerate({ name:bizName, description:bizDesc, audience, channels:channels.map(id=>CHANNELS.find(c=>c.id===id)?.label) });
-    setLoading(false);
-    if (data) {
-      const plan = { id:uid(), name:bizName, description:bizDesc, audience, channels:channels.map(id=>CHANNELS.find(c=>c.id===id)?.label), results:data, createdAt:new Date().toISOString() };
-      setPlans(p=>[plan,...p]);
+    try {
+      const data = await api('/api/plans/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: bizName,
+          description: bizDesc,
+          audience,
+          channels: channels.map(id => CHANNELS.find(c => c.id === id)?.label),
+        }),
+      });
+      const plan = data.plan;
+      // Parse results if it's a string
+      if (typeof plan.results === 'string') plan.results = JSON.parse(plan.results);
+      setPlans(p => [plan, ...p]);
       setActivePlan(plan);
       setDashTab("social");
       setPage("plan");
       setBizName(""); setBizDesc(""); setAudience(""); setChannels([]); setStep(0);
       setToast("Plan generated!");
-    } else { setToast("Generation failed. Try again."); }
+    } catch (e) {
+      setToast(e.message || "Generation failed. Try again.");
+    }
+    setLoading(false);
   };
 
-  const saveEditFn = (planId, section, idx, field) => {
-    const update = p => { if (p.id!==planId) return p; const r={...p.results}; r[section]=[...r[section]]; r[section][idx]={...r[section][idx],[field]:editTxt}; return {...p,results:r}; };
-    setPlans(ps=>ps.map(update));
-    if (activePlan?.id===planId) setActivePlan(update(activePlan));
+  // ── Edit content: saves to backend ──
+  const saveEditFn = async (planId, section, idx, field) => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    const results = { ...plan.results };
+    results[section] = [...results[section]];
+    results[section][idx] = { ...results[section][idx], [field]: editTxt };
+
+    // Update locally
+    const update = p => p.id === planId ? { ...p, results } : p;
+    setPlans(ps => ps.map(update));
+    if (activePlan?.id === planId) setActivePlan({ ...activePlan, results });
     setEditId(null);
-    setToast("Content updated");
+
+    // Save to backend
+    try {
+      await api(`/api/plans/${planId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ results }),
+      });
+      setToast("Content updated");
+    } catch { setToast("Save failed"); }
+  };
+
+  // ── Delete plan ──
+  const deletePlan = async (planId) => {
+    setPlans(p => p.filter(x => x.id !== planId));
+    if (activePlan?.id === planId) setPage("home");
+    try { await api(`/api/plans/${planId}`, { method: 'DELETE' }); } catch {}
   };
 
   // ── RENDER ──
@@ -207,12 +276,12 @@ function App() {
                   <div>
                     <div style={$.label}>Password</div>
                     <div style={{ position:"relative" }}>
-                      <input style={{...$.input,paddingRight:44}} type={showPass?"text":"password"} placeholder="••••••" value={authPass} onChange={e=>setAuthPass(e.target.value)} />
+                      <input style={{...$.input,paddingRight:44}} type={showPass?"text":"password"} placeholder="••••••" value={authPass} onChange={e=>setAuthPass(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleLogin()} />
                       <button style={{ position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer" }} onClick={()=>setShowPass(!showPass)}>{showPass?<I.EyeOff/>:<I.Eye/>}</button>
                     </div>
                   </div>
                   {authError && <div style={{ fontSize:12,color:"#F87171",background:"rgba(239,68,68,.1)",padding:"8px 12px",borderRadius:8 }}>{authError}</div>}
-                  <button style={$.btn} onClick={handleLogin}>Sign In</button>
+                  <button style={{...$.btn,opacity:authLoading?.6:1}} onClick={handleLogin} disabled={authLoading}>{authLoading?"Signing in...":"Sign In"}</button>
                 </div>
                 <p style={{ fontSize:13,color:"#64748B",textAlign:"center",marginTop:20 }}>
                   Don't have an account? <span style={{ color:"#A5B4FC",cursor:"pointer",fontWeight:600 }} onClick={()=>{setAuthPage("signup");setAuthError("");}}>Sign up</span>
@@ -228,12 +297,12 @@ function App() {
                   <div>
                     <div style={$.label}>Password</div>
                     <div style={{ position:"relative" }}>
-                      <input style={{...$.input,paddingRight:44}} type={showPass?"text":"password"} placeholder="6+ characters" value={authPass} onChange={e=>setAuthPass(e.target.value)} />
+                      <input style={{...$.input,paddingRight:44}} type={showPass?"text":"password"} placeholder="6+ characters" value={authPass} onChange={e=>setAuthPass(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleSignup()} />
                       <button style={{ position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer" }} onClick={()=>setShowPass(!showPass)}>{showPass?<I.EyeOff/>:<I.Eye/>}</button>
                     </div>
                   </div>
                   {authError && <div style={{ fontSize:12,color:"#F87171",background:"rgba(239,68,68,.1)",padding:"8px 12px",borderRadius:8 }}>{authError}</div>}
-                  <button style={$.btn} onClick={handleSignup}><I.Spark /> Create Account — Free</button>
+                  <button style={{...$.btn,opacity:authLoading?.6:1}} onClick={handleSignup} disabled={authLoading}>{authLoading?"Creating...":(<><I.Spark /> Create Account — Free</>)}</button>
                 </div>
                 <p style={{ fontSize:13,color:"#64748B",textAlign:"center",marginTop:20 }}>
                   Already have an account? <span style={{ color:"#A5B4FC",cursor:"pointer",fontWeight:600 }} onClick={()=>{setAuthPage("login");setAuthError("");}}>Sign in</span>
@@ -250,8 +319,11 @@ function App() {
               <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#6366F1,#34D399)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#fff",fontFamily:"'Outfit',sans-serif" }}>M</div>
               <span style={{ fontSize:18,fontWeight:800,fontFamily:"'Outfit',sans-serif" }}>Markly</span>
             </div>
-            <div style={{ width:30,height:30,borderRadius:10,background:"linear-gradient(135deg,#6366F1,#EC4899)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff" }} onClick={()=>setPage("settings")}>
-              {user.name?.charAt(0).toUpperCase()}
+            <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+              {user.plan !== "free" && <span style={{ fontSize:10,fontWeight:700,color:"#F472B6",background:"rgba(244,114,182,.1)",padding:"3px 8px",borderRadius:8,textTransform:"uppercase" }}>{user.plan}</span>}
+              <div style={{ width:30,height:30,borderRadius:10,background:"linear-gradient(135deg,#6366F1,#EC4899)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff" }} onClick={()=>setPage("settings")}>
+                {user.name?.charAt(0).toUpperCase()}
+              </div>
             </div>
           </div>
         )}
@@ -264,16 +336,22 @@ function App() {
               <span style={{ background:"linear-gradient(135deg,#818CF8,#34D399)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent" }}>What are we marketing today?</span>
             </h1>
             <button style={$.btn} onClick={()=>{setStep(0);setPage("create");}}><I.Plus /> Create New Plan</button>
-
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:20 }}>
+              <div style={{ ...$.card,textAlign:"center",padding:"14px" }}><div style={{ fontSize:22,fontWeight:800,color:"#818CF8" }}>{plans.length}</div><div style={{ fontSize:10,color:"#64748B",fontWeight:600 }}>Plans</div></div>
+              <div style={{ ...$.card,textAlign:"center",padding:"14px" }}><div style={{ fontSize:22,fontWeight:800,color:"#34D399" }}>{user.plan === 'free' ? 'Free' : user.plan?.toUpperCase()}</div><div style={{ fontSize:10,color:"#64748B",fontWeight:600 }}>Plan</div></div>
+            </div>
             {plans.length > 0 && (
-              <div style={{ marginTop:24 }}>
-                <div style={{ ...$.label,marginBottom:12 }}>Recent Plans</div>
-                {plans.slice(0,5).map(p=>(
+              <div style={{ marginTop:20 }}>
+                <div style={{ ...$.label,marginBottom:12 }}>Your Plans</div>
+                {plans.map(p=>(
                   <div key={p.id} style={{ ...$.card,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center" }}
-                    onClick={()=>{setActivePlan(p);setDashTab("social");setPage("plan");}}>
+                    onClick={()=>{
+                      const plan = typeof p.results === 'string' ? {...p, results: JSON.parse(p.results)} : p;
+                      setActivePlan(plan);setDashTab("social");setPage("plan");
+                    }}>
                     <div>
                       <div style={{ fontSize:14,fontWeight:700 }}>{p.name}</div>
-                      <div style={{ fontSize:11,color:"#64748B",marginTop:2 }}>{p.channels?.length || 0} channels</div>
+                      <div style={{ fontSize:11,color:"#64748B",marginTop:2 }}>{(p.channels||[]).length} channels</div>
                     </div>
                     <I.Arrow />
                   </div>
@@ -332,11 +410,13 @@ function App() {
         {/* ══ PLAN VIEW ══ */}
         {user && page === "plan" && activePlan && !loading && (
           <div style={{ paddingTop:16,animation:"fadeUp .4s ease-out" }}>
-            <div style={{ cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:"#64748B",fontSize:12,marginBottom:14 }} onClick={()=>setPage("home")}><I.Back /> Home</div>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
+              <div style={{ cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:"#64748B",fontSize:12 }} onClick={()=>setPage("home")}><I.Back /> Home</div>
+              <button style={{...$.sm,color:"#EF4444",borderColor:"rgba(239,68,68,.2)"}} onClick={()=>deletePlan(activePlan.id)}>Delete</button>
+            </div>
             <div style={{ fontSize:18,fontWeight:800,fontFamily:"'Outfit',sans-serif" }}>{activePlan.name}</div>
             <div style={{ fontSize:11,color:"#64748B",marginTop:2,marginBottom:14 }}>{activePlan.audience}</div>
 
-            {/* Strategy */}
             {activePlan.results?.strategy && (
               <div style={{ ...$.card,background:"linear-gradient(135deg,rgba(99,102,241,.06),rgba(52,211,153,.04))",border:"1px solid rgba(129,140,248,.15)",marginBottom:16 }}>
                 <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:7 }}><I.Spark /><span style={{ fontSize:12,fontWeight:700,color:"#A5B4FC" }}>Strategy</span></div>
@@ -348,7 +428,6 @@ function App() {
               </div>
             )}
 
-            {/* Tabs */}
             <div style={{ display:"flex",gap:3,background:"#0F172A",borderRadius:11,padding:3,marginBottom:14 }}>
               {[{id:"social",icon:<I.Social />,l:"Social"},{id:"email",icon:<I.Mail />,l:"Email"},{id:"ads",icon:<I.Ad />,l:"Ads"}].map(t=>(
                 <button key={t.id} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px",borderRadius:8,border:"none",background:dashTab===t.id?"rgba(129,140,248,.14)":"transparent",color:dashTab===t.id?"#A5B4FC":"#475569",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }} onClick={()=>setDashTab(t.id)}>
@@ -357,7 +436,6 @@ function App() {
               ))}
             </div>
 
-            {/* Social */}
             {dashTab==="social" && activePlan.results?.social_posts?.map((post,i) => (
               <div key={i} style={$.card}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 }}>
@@ -377,7 +455,6 @@ function App() {
               </div>
             ))}
 
-            {/* Email */}
             {dashTab==="email" && activePlan.results?.email_sequences?.map((em,i) => (
               <div key={i} style={$.card}>
                 <div style={{ fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4 }}>{em.name}</div>
@@ -395,7 +472,6 @@ function App() {
               </div>
             ))}
 
-            {/* Ads */}
             {dashTab==="ads" && activePlan.results?.ad_copy?.map((ad,i) => (
               <div key={i} style={$.card}>
                 <div style={{ fontSize:11,fontWeight:700,color:pColor(ad.platform),marginBottom:5 }}>{ad.platform}</div>
@@ -430,7 +506,7 @@ function App() {
               </div>
             </div>
             <div style={$.card}>
-              <div style={{ fontSize:14,fontWeight:700 }}>Plan: Free</div>
+              <div style={{ fontSize:14,fontWeight:700 }}>Plan: {user.plan === 'free' ? 'Free' : user.plan?.charAt(0).toUpperCase() + user.plan?.slice(1)}</div>
               <div style={{ fontSize:11,color:"#64748B" }}>{plans.length} plans created</div>
             </div>
             <button style={{ ...$.btnGhost,width:"100%",marginTop:16,color:"#EF4444",borderColor:"rgba(239,68,68,.2)" }} onClick={handleLogout}>
@@ -461,6 +537,5 @@ function App() {
   );
 }
 
-// ── Mount ──
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
