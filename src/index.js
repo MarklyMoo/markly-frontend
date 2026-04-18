@@ -1,38 +1,466 @@
 import React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 
+// ── Utilities ──
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const copy = (t) => navigator.clipboard && navigator.clipboard.writeText(t);
+
+// ── Icons ──
+const I = {
+  Spark: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>,
+  Check: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  Arrow: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  Back: () => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+  Copy: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>,
+  Refresh: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>,
+  Plus: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  Home: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  Social: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A3 3 0 1018 2a3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6z"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+  Mail: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  Ad: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  Edit: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  Eye: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  EyeOff: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
+  Logout: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  Settings: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+};
+
+// ── Config ──
+const API = process.env.REACT_APP_API_URL || '';
+const CHANNELS = [
+  { id:"instagram", label:"Instagram" }, { id:"facebook", label:"Facebook" },
+  { id:"tiktok", label:"TikTok" }, { id:"twitter", label:"X / Twitter" },
+  { id:"linkedin", label:"LinkedIn" }, { id:"email", label:"Email" },
+  { id:"google_ads", label:"Google Ads" }, { id:"pinterest", label:"Pinterest" },
+];
+const AUDIENCES = ["Young adults (18-25)","Professionals (25-40)","Parents & families","Small business owners","Seniors (55+)","Gen Z & teens","Everyone / General"];
+const pColor = (p) => {
+  if (!p) return "#818CF8";
+  const map = { instagram:"#E1306C", facebook:"#1877F2", tiktok:"#00F2EA", twitter:"#1DA1F2", linkedin:"#0A66C2", email:"#34D399", google:"#FBBC05", pinterest:"#E60023" };
+  for (const [k,v] of Object.entries(map)) { if (p.toLowerCase().includes(k)) return v; }
+  return "#818CF8";
+};
+
+// ── Styles ──
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&family=Outfit:wght@700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+input:focus,textarea:focus{border-color:#818CF8!important;outline:none}
+::selection{background:rgba(129,140,248,.3)}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:#1E293B;border-radius:4px}
+`;
+const $ = {
+  input: { width:"100%",padding:"13px 14px",borderRadius:11,border:"1px solid #1E293B",background:"#0F172A",color:"#E8ECF4",fontSize:15,outline:"none",boxSizing:"border-box",fontFamily:"inherit" },
+  textarea: { width:"100%",padding:"13px 14px",borderRadius:11,border:"1px solid #1E293B",background:"#0F172A",color:"#E8ECF4",fontSize:15,outline:"none",resize:"vertical",minHeight:90,lineHeight:1.5,boxSizing:"border-box",fontFamily:"inherit" },
+  chip: (on) => ({ display:"inline-flex",alignItems:"center",gap:5,padding:"9px 14px",borderRadius:20,border:on?"1.5px solid #818CF8":"1.5px solid #1E293B",background:on?"rgba(129,140,248,.12)":"#0F172A",color:on?"#A5B4FC":"#94A3B8",fontSize:13,fontWeight:500,cursor:"pointer",transition:"all .2s",userSelect:"none" }),
+  label: { fontSize:11,fontWeight:600,color:"#64748B",textTransform:"uppercase",letterSpacing:".06em",marginBottom:7 },
+  card: { background:"rgba(15,23,42,.85)",border:"1px solid #1E293B",borderRadius:14,padding:16,marginBottom:12,animation:"fadeUp .35s ease-out both" },
+  btn: { display:"flex",alignItems:"center",justifyContent:"center",gap:8,width:"100%",padding:"14px",borderRadius:13,border:"none",background:"linear-gradient(135deg,#6366F1,#8B5CF6)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(99,102,241,.3)",fontFamily:"inherit" },
+  btnGhost: { display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"10px 16px",borderRadius:10,border:"1.5px solid #1E293B",background:"transparent",color:"#94A3B8",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit" },
+  sm: { display:"flex",alignItems:"center",gap:4,padding:"5px 10px",borderRadius:7,border:"1px solid #1E293B",background:"transparent",color:"#64748B",fontSize:11,fontWeight:500,cursor:"pointer",fontFamily:"inherit" },
+  dot: (a, d) => ({ width:28,height:4,borderRadius:2,background:d?"#34D399":a?"#818CF8":"#1E293B",transition:"all .3s" }),
+};
+
+// ── AI Generate ──
+async function aiGenerate({ name, description, audience, channels }) {
+  const prompt = `You are an expert marketing strategist. Generate a complete marketing plan.\n\nBusiness: ${name}\nDescription: ${description}\nAudience: ${audience}\nChannels: ${channels.join(", ")}\n\nRespond ONLY with valid JSON:\n{"strategy":{"summary":"...","tone":"...","posting_frequency":"...","key_themes":["...","...","..."]},"social_posts":[{"platform":"...","content":"...","type":"...","best_time":"..."}],"email_sequences":[{"name":"...","subject":"...","preview":"...","body":"..."}],"ad_copy":[{"platform":"...","headline":"...","body":"...","cta":"...","targeting_tip":"..."}]}\nGenerate 4+ social posts, 2 emails, 2 ads. Be specific. No markdown.`;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:4000, messages:[{role:"user",content:prompt}] }) });
+    const d = await r.json();
+    return JSON.parse((d.content?.map(c=>c.text||"").join("")||"").replace(/```json|```/g,"").trim());
+  } catch(e) { console.error(e); return null; }
+}
+
+// ── Copy Button ──
+function CopyBtn({ text }) {
+  const [c, setC] = useState(false);
+  return <button style={$.sm} onClick={() => { copy(text); setC(true); setTimeout(()=>setC(false),1200); }}>{c?<I.Check/>:<I.Copy/>}{c?"Copied":"Copy"}</button>;
+}
+
+// ── Toast ──
+function Toast({ msg, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, [onDone]);
+  return <div style={{ position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:200,background:"#34D399",color:"#0B0F1A",padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700,animation:"fadeUp .25s ease-out",fontFamily:"'DM Sans',sans-serif" }}>{msg}</div>;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  MAIN APP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function App() {
+  // Auth
+  const [user, setUser] = useState(null);
+  const [authPage, setAuthPage] = useState("login");
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [authError, setAuthError] = useState("");
+
+  // App
+  const [page, setPage] = useState("home");
+  const [step, setStep] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState("");
+
+  // Form
+  const [bizName, setBizName] = useState("");
+  const [bizDesc, setBizDesc] = useState("");
+  const [audience, setAudience] = useState("");
+  const [channels, setChannels] = useState([]);
+
+  // Data
+  const [plans, setPlans] = useState([]);
+  const [activePlan, setActivePlan] = useState(null);
+  const [dashTab, setDashTab] = useState("social");
+
+  // Editing
+  const [editId, setEditId] = useState(null);
+  const [editTxt, setEditTxt] = useState("");
+
+  // Loading messages
+  const loadMsgs = ["Analyzing your business...","Crafting brand voice...","Generating social posts...","Writing emails...","Building ad campaigns...","Finalizing plan..."];
+  const [loadIdx, setLoadIdx] = useState(0);
+  useEffect(() => { if (!loading) return; const t = setInterval(()=>setLoadIdx(i=>(i+1)%loadMsgs.length), 2200); return ()=>clearInterval(t); }, [loading]);
+
+  // Auth - stored in localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('markly-user');
+    if (saved) { try { setUser(JSON.parse(saved)); } catch {} }
+    const savedPlans = localStorage.getItem('markly-plans');
+    if (savedPlans) { try { setPlans(JSON.parse(savedPlans)); } catch {} }
+  }, []);
+  useEffect(() => { if (user) localStorage.setItem('markly-user', JSON.stringify(user)); }, [user]);
+  useEffect(() => { localStorage.setItem('markly-plans', JSON.stringify(plans)); }, [plans]);
+
+  // Simple local auth (no backend needed for now)
+  const handleSignup = () => {
+    if (!authName.trim() || !authEmail.trim() || !authPass.trim()) { setAuthError("All fields required"); return; }
+    if (authPass.length < 6) { setAuthError("Password must be 6+ characters"); return; }
+    const newUser = { id: uid(), name: authName.trim(), email: authEmail.trim(), plan: "free" };
+    setUser(newUser);
+    setAuthError("");
+    setToast("Welcome to Markly!");
+  };
+  const handleLogin = () => {
+    if (!authEmail.trim() || !authPass.trim()) { setAuthError("Email and password required"); return; }
+    const saved = localStorage.getItem('markly-user');
+    if (saved) { setUser(JSON.parse(saved)); setAuthError(""); setToast("Welcome back!"); }
+    else { setAuthError("No account found. Sign up first."); }
+  };
+  const handleLogout = () => { setUser(null); localStorage.removeItem('markly-user'); setPage("home"); };
+
+  const toggleCh = (id) => setChannels(p => p.includes(id)?p.filter(c=>c!==id):[...p,id]);
+  const canNext = () => step===0?bizName.trim()&&bizDesc.trim():step===1?!!audience:channels.length>0;
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    const data = await aiGenerate({ name:bizName, description:bizDesc, audience, channels:channels.map(id=>CHANNELS.find(c=>c.id===id)?.label) });
+    setLoading(false);
+    if (data) {
+      const plan = { id:uid(), name:bizName, description:bizDesc, audience, channels:channels.map(id=>CHANNELS.find(c=>c.id===id)?.label), results:data, createdAt:new Date().toISOString() };
+      setPlans(p=>[plan,...p]);
+      setActivePlan(plan);
+      setDashTab("social");
+      setPage("plan");
+      setBizName(""); setBizDesc(""); setAudience(""); setChannels([]); setStep(0);
+      setToast("Plan generated!");
+    } else { setToast("Generation failed. Try again."); }
+  };
+
+  const saveEditFn = (planId, section, idx, field) => {
+    const update = p => { if (p.id!==planId) return p; const r={...p.results}; r[section]=[...r[section]]; r[section][idx]={...r[section][idx],[field]:editTxt}; return {...p,results:r}; };
+    setPlans(ps=>ps.map(update));
+    if (activePlan?.id===planId) setActivePlan(update(activePlan));
+    setEditId(null);
+    setToast("Content updated");
+  };
+
+  // ── RENDER ──
   return (
-    <div style={{
-      fontFamily: "system-ui, sans-serif",
-      background: "#0B0F1A",
-      color: "#E8ECF4",
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      textAlign: "center",
-      padding: 20
-    }}>
-      <div>
-        <div style={{
-          width: 60, height: 60, borderRadius: 16,
-          background: "linear-gradient(135deg, #6366F1, #34D399)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 28, fontWeight: 900, color: "#fff",
-          margin: "0 auto 20px"
-        }}>M</div>
-        <h1 style={{ fontSize: 36, fontWeight: 800, marginBottom: 10 }}>Markly</h1>
-        <p style={{ color: "#94A3B8", fontSize: 16, marginBottom: 30 }}>
-          AI-Powered Marketing Automation
-        </p>
-        <p style={{ color: "#34D399", fontSize: 14 }}>
-          ✅ Frontend is live and working!
-        </p>
+    <div style={{ fontFamily:"'DM Sans',system-ui,sans-serif",background:"#0B0F1A",color:"#E8ECF4",minHeight:"100vh" }}>
+      <style>{CSS}</style>
+      <div style={{ position:"fixed",inset:0,zIndex:0,pointerEvents:"none",background:"radial-gradient(ellipse 60% 50% at 20% 20%,rgba(99,102,241,.08) 0%,transparent 70%),radial-gradient(ellipse 50% 60% at 80% 80%,rgba(16,185,129,.06) 0%,transparent 70%)" }} />
+      {toast && <Toast msg={toast} onDone={()=>setToast("")} />}
+
+      <div style={{ position:"relative",zIndex:1,maxWidth:480,margin:"0 auto",padding:"0 16px",paddingBottom:user?80:0 }}>
+
+        {/* ══ AUTH ══ */}
+        {!user && (
+          <div style={{ paddingTop:60,animation:"fadeUp .5s ease-out" }}>
+            <div style={{ textAlign:"center",marginBottom:36 }}>
+              <div style={{ display:"inline-flex",alignItems:"center",gap:9 }}>
+                <div style={{ width:40,height:40,borderRadius:12,background:"linear-gradient(135deg,#6366F1,#34D399)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,fontWeight:900,color:"#fff",fontFamily:"'Outfit',sans-serif" }}>M</div>
+                <span style={{ fontSize:22,fontWeight:800,fontFamily:"'Outfit',sans-serif" }}>Markly</span>
+              </div>
+            </div>
+
+            {authPage === "login" ? (
+              <>
+                <h2 style={{ fontSize:24,fontWeight:800,textAlign:"center",marginBottom:6,fontFamily:"'Outfit',sans-serif" }}>Welcome back</h2>
+                <p style={{ fontSize:13,color:"#64748B",textAlign:"center",marginBottom:28 }}>Sign in to your account</p>
+                <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+                  <div><div style={$.label}>Email</div><input style={$.input} type="email" placeholder="you@example.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} /></div>
+                  <div>
+                    <div style={$.label}>Password</div>
+                    <div style={{ position:"relative" }}>
+                      <input style={{...$.input,paddingRight:44}} type={showPass?"text":"password"} placeholder="••••••" value={authPass} onChange={e=>setAuthPass(e.target.value)} />
+                      <button style={{ position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer" }} onClick={()=>setShowPass(!showPass)}>{showPass?<I.EyeOff/>:<I.Eye/>}</button>
+                    </div>
+                  </div>
+                  {authError && <div style={{ fontSize:12,color:"#F87171",background:"rgba(239,68,68,.1)",padding:"8px 12px",borderRadius:8 }}>{authError}</div>}
+                  <button style={$.btn} onClick={handleLogin}>Sign In</button>
+                </div>
+                <p style={{ fontSize:13,color:"#64748B",textAlign:"center",marginTop:20 }}>
+                  Don't have an account? <span style={{ color:"#A5B4FC",cursor:"pointer",fontWeight:600 }} onClick={()=>{setAuthPage("signup");setAuthError("");}}>Sign up</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontSize:24,fontWeight:800,textAlign:"center",marginBottom:6,fontFamily:"'Outfit',sans-serif" }}>Create account</h2>
+                <p style={{ fontSize:13,color:"#64748B",textAlign:"center",marginBottom:28 }}>Start marketing smarter today</p>
+                <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
+                  <div><div style={$.label}>Full Name</div><input style={$.input} placeholder="Your name" value={authName} onChange={e=>setAuthName(e.target.value)} /></div>
+                  <div><div style={$.label}>Email</div><input style={$.input} type="email" placeholder="you@example.com" value={authEmail} onChange={e=>setAuthEmail(e.target.value)} /></div>
+                  <div>
+                    <div style={$.label}>Password</div>
+                    <div style={{ position:"relative" }}>
+                      <input style={{...$.input,paddingRight:44}} type={showPass?"text":"password"} placeholder="6+ characters" value={authPass} onChange={e=>setAuthPass(e.target.value)} />
+                      <button style={{ position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer" }} onClick={()=>setShowPass(!showPass)}>{showPass?<I.EyeOff/>:<I.Eye/>}</button>
+                    </div>
+                  </div>
+                  {authError && <div style={{ fontSize:12,color:"#F87171",background:"rgba(239,68,68,.1)",padding:"8px 12px",borderRadius:8 }}>{authError}</div>}
+                  <button style={$.btn} onClick={handleSignup}><I.Spark /> Create Account — Free</button>
+                </div>
+                <p style={{ fontSize:13,color:"#64748B",textAlign:"center",marginTop:20 }}>
+                  Already have an account? <span style={{ color:"#A5B4FC",cursor:"pointer",fontWeight:600 }} onClick={()=>{setAuthPage("login");setAuthError("");}}>Sign in</span>
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ══ HEADER ══ */}
+        {user && (
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:14,paddingBottom:10,borderBottom:"1px solid #111827" }}>
+            <div onClick={()=>setPage("home")} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:9}}>
+              <div style={{ width:30,height:30,borderRadius:9,background:"linear-gradient(135deg,#6366F1,#34D399)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:"#fff",fontFamily:"'Outfit',sans-serif" }}>M</div>
+              <span style={{ fontSize:18,fontWeight:800,fontFamily:"'Outfit',sans-serif" }}>Markly</span>
+            </div>
+            <div style={{ width:30,height:30,borderRadius:10,background:"linear-gradient(135deg,#6366F1,#EC4899)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff" }} onClick={()=>setPage("settings")}>
+              {user.name?.charAt(0).toUpperCase()}
+            </div>
+          </div>
+        )}
+
+        {/* ══ HOME ══ */}
+        {user && page === "home" && !loading && (
+          <div style={{ paddingTop:28,animation:"fadeUp .4s ease-out" }}>
+            <div style={{ fontSize:15,color:"#94A3B8",marginBottom:4 }}>Hey {user.name?.split(" ")[0]}</div>
+            <h1 style={{ fontSize:28,fontWeight:800,lineHeight:1.1,fontFamily:"'Outfit',sans-serif",marginBottom:24 }}>
+              <span style={{ background:"linear-gradient(135deg,#818CF8,#34D399)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent" }}>What are we marketing today?</span>
+            </h1>
+            <button style={$.btn} onClick={()=>{setStep(0);setPage("create");}}><I.Plus /> Create New Plan</button>
+
+            {plans.length > 0 && (
+              <div style={{ marginTop:24 }}>
+                <div style={{ ...$.label,marginBottom:12 }}>Recent Plans</div>
+                {plans.slice(0,5).map(p=>(
+                  <div key={p.id} style={{ ...$.card,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center" }}
+                    onClick={()=>{setActivePlan(p);setDashTab("social");setPage("plan");}}>
+                    <div>
+                      <div style={{ fontSize:14,fontWeight:700 }}>{p.name}</div>
+                      <div style={{ fontSize:11,color:"#64748B",marginTop:2 }}>{p.channels?.length || 0} channels</div>
+                    </div>
+                    <I.Arrow />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ CREATE ══ */}
+        {user && page === "create" && !loading && (
+          <div style={{ paddingTop:24,animation:"fadeUp .4s ease-out" }}>
+            <div style={{ display:"flex",gap:5,marginBottom:24 }}>{["Business","Audience","Channels"].map((l,i)=><div key={l} style={$.dot(i===step,i<step)} />)}</div>
+            {step===0 && (
+              <div style={{ display:"flex",flexDirection:"column",gap:16 }}>
+                <div style={{ fontSize:20,fontWeight:800,fontFamily:"'Outfit',sans-serif" }}>Tell us about your business</div>
+                <div><div style={$.label}>Business Name</div><input style={$.input} placeholder="e.g. Fresh Bakes Co." value={bizName} onChange={e=>setBizName(e.target.value)} /></div>
+                <div><div style={$.label}>Description</div><textarea style={$.textarea} placeholder="What does your business do?" value={bizDesc} onChange={e=>setBizDesc(e.target.value)} /></div>
+              </div>
+            )}
+            {step===1 && (
+              <div>
+                <div style={{ fontSize:20,fontWeight:800,fontFamily:"'Outfit',sans-serif",marginBottom:14 }}>Who are your customers?</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>{AUDIENCES.map(a=><div key={a} style={$.chip(audience===a)} onClick={()=>setAudience(a)}>{audience===a&&<I.Check />}{a}</div>)}</div>
+              </div>
+            )}
+            {step===2 && (
+              <div>
+                <div style={{ fontSize:20,fontWeight:800,fontFamily:"'Outfit',sans-serif",marginBottom:14 }}>Select your channels</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>{CHANNELS.map(ch=><div key={ch.id} style={$.chip(channels.includes(ch.id))} onClick={()=>toggleCh(ch.id)}>{channels.includes(ch.id)&&<I.Check />}{ch.label}</div>)}</div>
+              </div>
+            )}
+            <div style={{ display:"flex",gap:10,marginTop:28 }}>
+              <button style={$.btnGhost} onClick={()=>step>0?setStep(step-1):setPage("home")}><I.Back /> {step>0?"Back":"Home"}</button>
+              <button style={{ ...$.btn,opacity:canNext()?1:.4,pointerEvents:canNext()?"auto":"none" }} onClick={()=>step<2?setStep(step+1):handleGenerate()}>
+                {step===2?<><I.Spark /> Generate</>:<>Continue <I.Arrow /></>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══ LOADING ══ */}
+        {user && loading && (
+          <div style={{ display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:24 }}>
+            <div style={{ position:"relative",width:64,height:64 }}>
+              <div style={{ position:"absolute",inset:0,borderRadius:"50%",background:"conic-gradient(from 0deg,#6366F1,#8B5CF6,#EC4899,#34D399,#6366F1)",animation:"spin 2s linear infinite",opacity:.3 }} />
+              <div style={{ position:"absolute",inset:5,borderRadius:"50%",background:"#0B0F1A",display:"flex",alignItems:"center",justifyContent:"center" }}><I.Spark /></div>
+            </div>
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:16,fontWeight:700,marginBottom:5 }}>Building your plan</div>
+              <div style={{ fontSize:13,color:"#818CF8",fontWeight:500 }}>{loadMsgs[loadIdx]}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ══ PLAN VIEW ══ */}
+        {user && page === "plan" && activePlan && !loading && (
+          <div style={{ paddingTop:16,animation:"fadeUp .4s ease-out" }}>
+            <div style={{ cursor:"pointer",display:"flex",alignItems:"center",gap:5,color:"#64748B",fontSize:12,marginBottom:14 }} onClick={()=>setPage("home")}><I.Back /> Home</div>
+            <div style={{ fontSize:18,fontWeight:800,fontFamily:"'Outfit',sans-serif" }}>{activePlan.name}</div>
+            <div style={{ fontSize:11,color:"#64748B",marginTop:2,marginBottom:14 }}>{activePlan.audience}</div>
+
+            {/* Strategy */}
+            {activePlan.results?.strategy && (
+              <div style={{ ...$.card,background:"linear-gradient(135deg,rgba(99,102,241,.06),rgba(52,211,153,.04))",border:"1px solid rgba(129,140,248,.15)",marginBottom:16 }}>
+                <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:7 }}><I.Spark /><span style={{ fontSize:12,fontWeight:700,color:"#A5B4FC" }}>Strategy</span></div>
+                <div style={{ fontSize:13,color:"#CBD5E1",lineHeight:1.55,marginBottom:8 }}>{activePlan.results.strategy.summary}</div>
+                <div style={{ display:"flex",flexWrap:"wrap",gap:4 }}>
+                  <span style={{ fontSize:10,color:"#34D399",background:"rgba(52,211,153,.1)",padding:"3px 8px",borderRadius:8 }}>{activePlan.results.strategy.tone}</span>
+                  <span style={{ fontSize:10,color:"#818CF8",background:"rgba(129,140,248,.1)",padding:"3px 8px",borderRadius:8 }}>{activePlan.results.strategy.posting_frequency}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div style={{ display:"flex",gap:3,background:"#0F172A",borderRadius:11,padding:3,marginBottom:14 }}>
+              {[{id:"social",icon:<I.Social />,l:"Social"},{id:"email",icon:<I.Mail />,l:"Email"},{id:"ads",icon:<I.Ad />,l:"Ads"}].map(t=>(
+                <button key={t.id} style={{ flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"8px",borderRadius:8,border:"none",background:dashTab===t.id?"rgba(129,140,248,.14)":"transparent",color:dashTab===t.id?"#A5B4FC":"#475569",fontSize:10,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }} onClick={()=>setDashTab(t.id)}>
+                  {t.icon}{t.l}
+                </button>
+              ))}
+            </div>
+
+            {/* Social */}
+            {dashTab==="social" && activePlan.results?.social_posts?.map((post,i) => (
+              <div key={i} style={$.card}>
+                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 }}>
+                  <span style={{ fontSize:11,fontWeight:700,color:pColor(post.platform) }}>{post.platform}</span>
+                  {post.type&&<span style={{ fontSize:9,fontWeight:600,color:"#34D399",background:"rgba(52,211,153,.1)",padding:"2px 7px",borderRadius:10 }}>{post.type}</span>}
+                </div>
+                {editId===`s-${i}` ? (
+                  <div><textarea style={{...$.textarea,minHeight:70}} value={editTxt} onChange={e=>setEditTxt(e.target.value)} /><div style={{ display:"flex",gap:5,marginTop:6 }}><button style={$.sm} onClick={()=>saveEditFn(activePlan.id,"social_posts",i,"content")}><I.Check /> Save</button><button style={$.sm} onClick={()=>setEditId(null)}>Cancel</button></div></div>
+                ) : (
+                  <div style={{ fontSize:13,color:"#CBD5E1",lineHeight:1.55,whiteSpace:"pre-wrap" }}>{post.content}</div>
+                )}
+                {post.best_time&&<div style={{ fontSize:10,color:"#475569",marginTop:5 }}>{post.best_time}</div>}
+                <div style={{ display:"flex",gap:5,marginTop:8,flexWrap:"wrap" }}>
+                  <CopyBtn text={post.content} />
+                  <button style={$.sm} onClick={()=>{setEditId(`s-${i}`);setEditTxt(post.content);}}><I.Edit /> Edit</button>
+                </div>
+              </div>
+            ))}
+
+            {/* Email */}
+            {dashTab==="email" && activePlan.results?.email_sequences?.map((em,i) => (
+              <div key={i} style={$.card}>
+                <div style={{ fontSize:11,fontWeight:700,color:"#64748B",textTransform:"uppercase",letterSpacing:".05em",marginBottom:4 }}>{em.name}</div>
+                <div style={{ fontSize:14,fontWeight:700,marginBottom:2 }}>{em.subject}</div>
+                <div style={{ fontSize:11,color:"#818CF8",fontStyle:"italic",marginBottom:8 }}>{em.preview}</div>
+                {editId===`e-${i}` ? (
+                  <div><textarea style={{...$.textarea,minHeight:100}} value={editTxt} onChange={e=>setEditTxt(e.target.value)} /><div style={{ display:"flex",gap:5,marginTop:6 }}><button style={$.sm} onClick={()=>saveEditFn(activePlan.id,"email_sequences",i,"body")}><I.Check /> Save</button><button style={$.sm} onClick={()=>setEditId(null)}>Cancel</button></div></div>
+                ) : (
+                  <div style={{ fontSize:13,color:"#CBD5E1",lineHeight:1.55,whiteSpace:"pre-wrap" }}>{em.body}</div>
+                )}
+                <div style={{ display:"flex",gap:5,marginTop:8,flexWrap:"wrap" }}>
+                  <CopyBtn text={`Subject: ${em.subject}\n\n${em.body}`} />
+                  <button style={$.sm} onClick={()=>{setEditId(`e-${i}`);setEditTxt(em.body);}}><I.Edit /> Edit</button>
+                </div>
+              </div>
+            ))}
+
+            {/* Ads */}
+            {dashTab==="ads" && activePlan.results?.ad_copy?.map((ad,i) => (
+              <div key={i} style={$.card}>
+                <div style={{ fontSize:11,fontWeight:700,color:pColor(ad.platform),marginBottom:5 }}>{ad.platform}</div>
+                <div style={{ fontSize:14,fontWeight:700,color:"#F472B6",marginBottom:5 }}>{ad.headline}</div>
+                {editId===`a-${i}` ? (
+                  <div><textarea style={{...$.textarea,minHeight:70}} value={editTxt} onChange={e=>setEditTxt(e.target.value)} /><div style={{ display:"flex",gap:5,marginTop:6 }}><button style={$.sm} onClick={()=>saveEditFn(activePlan.id,"ad_copy",i,"body")}><I.Check /> Save</button><button style={$.sm} onClick={()=>setEditId(null)}>Cancel</button></div></div>
+                ) : (
+                  <div style={{ fontSize:13,color:"#CBD5E1",lineHeight:1.55,whiteSpace:"pre-wrap" }}>{ad.body}</div>
+                )}
+                <div style={{ display:"inline-block",marginTop:8,padding:"6px 14px",borderRadius:7,background:"linear-gradient(135deg,#6366F1,#8B5CF6)",color:"#fff",fontSize:11,fontWeight:700 }}>{ad.cta}</div>
+                {ad.targeting_tip&&<div style={{ fontSize:10,color:"#475569",marginTop:6 }}>Targeting: {ad.targeting_tip}</div>}
+                <div style={{ display:"flex",gap:5,marginTop:8,flexWrap:"wrap" }}>
+                  <CopyBtn text={`${ad.headline}\n\n${ad.body}\n\nCTA: ${ad.cta}`} />
+                  <button style={$.sm} onClick={()=>{setEditId(`a-${i}`);setEditTxt(ad.body);}}><I.Edit /> Edit</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ══ SETTINGS ══ */}
+        {user && page === "settings" && (
+          <div style={{ paddingTop:16,animation:"fadeUp .4s ease-out" }}>
+            <div style={{ fontSize:18,fontWeight:800,fontFamily:"'Outfit',sans-serif",marginBottom:18 }}>Settings</div>
+            <div style={$.card}>
+              <div style={{ display:"flex",alignItems:"center",gap:12 }}>
+                <div style={{ width:48,height:48,borderRadius:14,background:"linear-gradient(135deg,#6366F1,#EC4899)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:900,color:"#fff" }}>{user.name?.charAt(0)}</div>
+                <div>
+                  <div style={{ fontSize:16,fontWeight:700 }}>{user.name}</div>
+                  <div style={{ fontSize:12,color:"#64748B" }}>{user.email}</div>
+                </div>
+              </div>
+            </div>
+            <div style={$.card}>
+              <div style={{ fontSize:14,fontWeight:700 }}>Plan: Free</div>
+              <div style={{ fontSize:11,color:"#64748B" }}>{plans.length} plans created</div>
+            </div>
+            <button style={{ ...$.btnGhost,width:"100%",marginTop:16,color:"#EF4444",borderColor:"rgba(239,68,68,.2)" }} onClick={handleLogout}>
+              <I.Logout /> Sign Out
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* ══ BOTTOM NAV ══ */}
+      {user && (
+        <div style={{ position:"fixed",bottom:0,left:0,right:0,zIndex:50,background:"rgba(11,15,26,.95)",borderTop:"1px solid #111827",backdropFilter:"blur(12px)" }}>
+          <div style={{ maxWidth:480,margin:"0 auto",display:"flex",justifyContent:"space-around",padding:"6px 0 10px" }}>
+            {[
+              {id:"home",icon:<I.Home />,l:"Home"},
+              {id:"create",icon:<I.Plus />,l:"Create"},
+              {id:"settings",icon:<I.Settings />,l:"Settings"},
+            ].map(n=>(
+              <button key={n.id} style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:2,border:"none",background:"none",color:page===n.id?"#A5B4FC":"#475569",fontSize:9,fontWeight:600,cursor:"pointer",padding:"3px 10px",fontFamily:"inherit" }}
+                onClick={()=>{if(n.id==="create"){setStep(0);}setPage(n.id);}}>
+                {n.icon}{n.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// ── Mount ──
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
